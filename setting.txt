@@ -1,0 +1,66 @@
+2020/10/16 LO example(CP odd):
+linkMELA=No
+linkColliderLib=No
+Collider=0
+DecayMode1=-9(Z->mumu)  0(Z->ll)
+Process=50(qq/ee->VH)
+HbbDK=1
+VegasNc2=10000
+DataFile=eeZHmumubb
+ghz4=1,0
+./JHUGen Collider=0 Process=50 DataFile=eeZHmumubb VegasNc2=10000 HbbDK=1 DecayMode1=-9 ghz1=0,0 ghz4=1,0
+
+2020.10.19 LO example(BSM CP even):
+linkMELA=No
+linkColliderLib=No
+Collider=0
+DecayMode1=-9(Z->mumu)  0(Z->ll)
+Process=50(qq/ee->VH)
+HbbDK=1
+VegasNc2=100000
+DataFile=eeZHmumubb
+ghz2=1,0
+./JHUGen Collider=0 Process=50 DataFile=eeZHmumubb VegasNc2=100000 HbbDK=1 DecayMode1=-9 ghz1=0,0 ghz2=1,0 
+
+2020/10/19 LO example(SM):
+linkMELA=No
+linkColliderLib=No
+Collider=0
+DecayMode1=-9(Z->mumu)  0(Z->ll)
+Process=50(qq/ee->VH)
+HbbDK=1
+VegasNc2=100000
+DataFile=eeZHmumubb
+ghz1=2,0
+
+Total command line:
+./JHUGen Collider=0 Process=50 DataFile=eeZHmumubb VegasNc2=100000 HbbDK=1 DecayMode1=-9 ghz1=2,0
+
+2020/12/01 LO example(Z(mumu)H(ZZ->4mu) SM files):
+linkMELA=No
+linkColliderLib=No
+Collider=0
+DecayMode1=-9(Z->mumu)  0(Z->ll)
+Process=50(qq/ee->VH)
+VegasNc2=100000
+DataFile=eeZHmumuH
+ghz1=2,0
+
+Total command line:
+./JHUGen Collider=0 Process=50 DataFile=eeZHmumuH VegasNc2=100000 DecayMode1=-9 ghz1=2,0
+./JHUGen ReadLHE=eeZHmumuH.lhe DecayMode1=-9 DecayMode2=-9 DataFile=ZHZZ6mu Interf=0
+
+2021/01/10 LO example(Z(mumu)H(ZZ->4mu) BSM CP even files):
+linkMELA=No
+linkColliderLib=No
+Collider=0
+DecayMode1=-9(Z->mumu)  0(Z->ll)
+Process=50(qq/ee->VH)
+VegasNc2=100000
+DataFile=eeZHmumuH
+ghz2=1,0
+
+Total command line:
+./JHUGen Collider=0 Process=50 DataFile=eeZHmumuH VegasNc2=100000 DecayMode1=-9 ghz1=0,0 ghz2=1,0
+./JHUGen ReadLHE=eeZHmumuH.lhe DecayMode1=-9 DecayMode2=-9 DataFile=ZHZZ6mu Interf=0
+
