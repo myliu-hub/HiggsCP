@@ -29,7 +29,7 @@ def usage():
 	sys.stdout.write('''
 			SYNOPSIS
 
-			./BDT_pre.py signal, bkg 
+			./BDT_pre.py signal bkg 
 
 			AUTHOR
 			Yanxi Gu <GUYANXI@ustc.edu>
@@ -55,14 +55,17 @@ def main():
     fin2 = ROOT.TFile(args[1])
 
     tree1 = fin1.Get("trialTree")
-    signal = tree1.AsMatrix(columns=branch_names)
+    signal0 = tree1.AsMatrix(columns=branch_names)
+    signal = signal0[:1000,:]
     tree2 = fin2.Get("trialTree")
-    backgr = tree2.AsMatrix(columns=branch_names)
+    backgr0 = tree2.AsMatrix(columns=branch_names)
+    backgr = backgr0[:1000,:]
 
     # for sklearn data is usually organised into one 2D array of shape (n_samples * n_features)
     # containing all the data and one array of categories of length n_samples
     X_raw = np.concatenate((signal, backgr))
     y_raw = np.concatenate((np.ones(signal.shape[0]), np.zeros(backgr.shape[0])))
+    print(len(signal))
 
     print ('part2')
 
