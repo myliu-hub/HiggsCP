@@ -105,6 +105,7 @@ case $option in
          ;;
 
     1.1.1) echo "Please prepare outfile_HZZ_SM.lhe"
+         ;;
 
     1.1.2) echo "Compiling root conversion script"
            c++ -o lhe_conversion_HZZ `root-config --glibs --cflags` -lm lhe_conversion_HZZ.cpp
@@ -128,7 +129,7 @@ case $option in
     1.2) echo "Run CP odd channel..."
          ;;
     1.2.1) echo "Please prepare outfile_HZZ_CPodd.lhe"
-
+         ;;
     1.2.2) echo "Compiling root conversion script"
            c++ -o lhe_conversion_HZZ `root-config --glibs --cflags` -lm lhe_conversion_HZZ.cpp
            ;;
@@ -151,7 +152,7 @@ case $option in
     1.3) echo "Run BSM CP even channel..."
          ;;
     1.3.1) echo "Please prepare outfile_HZZ_BSM_CPeven.lhe"
-
+         ;;
     1.3.2) echo "Compiling root conversion script"
            c++ -o lhe_conversion_HZZ `root-config --glibs --cflags` -lm lhe_conversion_HZZ.cpp
            ;;
