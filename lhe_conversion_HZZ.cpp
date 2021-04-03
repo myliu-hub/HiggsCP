@@ -25,6 +25,16 @@ struct ptSort: public std::binary_function<TLorentzVector, TLorentzVector, bool>
     }
 } ;
 
+double helicityAngle(TLorentzVector p4mother, TLorentzVector p4, TLorentzVector p4daughter){
+      TVector3 boost = -p4.BoostVector();
+      p4mother.Boost(boost);
+      p4daughter.Boost(boost);
+      TVector3 p3daughter= p4daughter.Vect();
+      TVector3 p3mother= p4mother.Vect();
+
+      return p3daughter.Dot(p3mother)/((p3daughter.Mag())*(p3mother.Mag()));
+}
+
 void computeAngles(TLorentzVector p4M11, 
     TLorentzVector p4M12, 
     TLorentzVector p4M21, 
@@ -43,51 +53,16 @@ void computeAngles(TLorentzVector p4M11,
       //build H 4-vectors
       TLorentzVector p4H = p4Z1 + p4Z2; 
 
+      //build mother of H
+      TLorentzVector p4m(0,0,0,250);
+
       // -----------------------------------
 
-      //costhetastar
-      TVector3 boostX = -(p4H.BoostVector());
-      TLorentzVector thep4Z1inXFrame( p4Z1 );
-      TLorentzVector thep4Z2inXFrame( p4Z2 );
-      thep4Z1inXFrame.Boost( boostX );
-      thep4Z2inXFrame.Boost( boostX );
-      TVector3 theZ1X_p3 = TVector3( thep4Z1inXFrame.X(), thep4Z1inXFrame.Y(), thep4Z1inXFrame.Z() );
-      TVector3 theZ2X_p3 = TVector3( thep4Z2inXFrame.X(), thep4Z2inXFrame.Y(), thep4Z2inXFrame.Z() );    
-      costhetastar = all.Vect().Dot(thep4Z1inXFrame.Vect())/(all.Vect().Mag()*thep4Z1inXFrame.Vect().Mag());
+      costhetastar=helicityAngle(p4m,p4H,p4Z1);
+      costheta1=helicityAngle(p4H,p4Z1,p4M11);
+      costheta2=helicityAngle(p4H,p4Z2,p4M21);
 
-      // --------------------------- costheta1
-      TVector3 boostV1 = -(p4Z1.BoostVector());
-      TLorentzVector p4M11_BV1( p4M11 );
-      TLorentzVector p4M12_BV1( p4M12 );
-      TLorentzVector p4M21_BV1( p4M21 );
-      TLorentzVector p4M22_BV1( p4M22 );
-      p4M11_BV1.Boost( boostV1 );
-      p4M12_BV1.Boost( boostV1 );
-      p4M21_BV1.Boost( boostV1 );
-      p4M22_BV1.Boost( boostV1 );
-
-      TLorentzVector p4V2_BV1 = p4M21_BV1 + p4M22_BV1;
-      // costheta1
-      costheta1 = -p4V2_BV1.Vect().Dot( p4M11_BV1.Vect() )/p4V2_BV1.Vect().Mag()/p4M11_BV1.Vect().Mag();
-
-      // --------------------------- costheta2
-      TVector3 boostV2 = -(p4Z2.BoostVector());
-      if (boostV2.Mag()>=1.) {
-        boostV2*=0.9999;
-      }
-      TLorentzVector p4M11_BV2( p4M11 );
-      TLorentzVector p4M12_BV2( p4M12 );
-      TLorentzVector p4M21_BV2( p4M21 );
-      TLorentzVector p4M22_BV2( p4M22 );
-      p4M11_BV2.Boost( boostV2 );
-      p4M12_BV2.Boost( boostV2 );
-      p4M21_BV2.Boost( boostV2 );
-      p4M22_BV2.Boost( boostV2 );
-
-      TLorentzVector p4V1_BV2 = p4M11_BV2 + p4M12_BV2;
-      // costheta2
-      costheta2 = -p4V1_BV2.Vect().Dot( p4M21_BV2.Vect() )/p4V1_BV2.Vect().Mag()/p4M21_BV2.Vect().Mag();
-
+      /*
       // --------------------------- Phi and Phi1 (old phistar1 - azimuthal production angle)
       //    TVector3 boostX = -(thep4H.BoostVector());
       TLorentzVector p4M11_BX( p4M11 );
@@ -126,13 +101,16 @@ void computeAngles(TLorentzVector p4M11,
       float tmpSgnPhi1 = p4Z1_BX.Vect().Dot( normal1_BX.Cross( normalSC_BX) );
       float sgnPhi1 = tmpSgnPhi1/fabs(tmpSgnPhi1);    
       Phi1 = sgnPhi1 * acos( normal1_BX.Dot( normalSC_BX) );    
+      */
 }
 
 
+//int lhe_conversion_HZZ(TString argv="outfile_HZZ_SM.lhe") {
 int main (int argc, char **argv) {
 
   // Open a stream connected to an event file:
   if (argc < 2) exit (1) ;
+  //std::ifstream ifs(argv);
   std::ifstream ifs(argv[1]);
 
   // Create the Reader object:
@@ -182,6 +160,7 @@ int main (int argc, char **argv) {
   TH1D *m_Zboson = new TH1D("m_Zboson","m_Zboson",20,80,100);
   TH1D *cos_theta1 = new TH1D("cos_theta1","cos_theta1",25,-1,1);
   TH1D *cos_theta2 = new TH1D("cos_theta2","cos_theta2",25,-1,1);
+  TH1D *cos_thetastar = new TH1D("cos_thetastar","cos_thetastar",25,-1,1);
   TH1D *plot_phi = new TH1D("phi","phi",50,-3.2,3.2);
   TLorentzVector Muon1Plus, Muon1Minus, Muon2Plus, Muon2Minus, MuonZPlus, MuonZMinus;
   TLorentzVector Z, Higgs, ElectronPlus, ElectronMinus;
@@ -393,17 +372,19 @@ int main (int argc, char **argv) {
     computeAngles(Muon1Plus, Muon1Minus, Muon2Plus, Muon2Minus, null, costhetastar, costheta1, costheta2, Phi, Phi1);
     cos_theta1->Fill(costheta1,weight);
     cos_theta2->Fill(costheta2,weight);
+    cos_thetastar->Fill(costhetastar,weight);
     plot_phi->Fill(Phi,weight);
 
     out_tree->Fill();
 
     } // Now loop over all events
 
-  cos_theta1->Draw();
-  cos_theta2->Draw();
-  plot_phi->Draw();
-  m_Zboson->Draw();
-  m_higgs->Draw();
+//  cos_theta1->Draw();
+//  cos_theta2->Draw();
+//  cos_thetastar->Draw();
+//  plot_phi->Draw();
+//  m_Zboson->Draw();
+//  m_higgs->Draw();
   outfile->Write();
   outfile->Close();
   // Now we are done.

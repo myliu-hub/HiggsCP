@@ -62,5 +62,5 @@ ghz2=1,0
 
 Total command line:
 ./JHUGen Collider=0 Process=50 DataFile=eeZHmumuH VegasNc2=100000 DecayMode1=-9 ghz1=0,0 ghz2=1,0
-./JHUGen ReadLHE=eeZHmumuH.lhe DecayMode1=-9 DecayMode2=-9 DataFile=ZHZZ6mu Interf=0
+./JHUGen ReadLHE=eeZHmumuH.lhe DecayMode1=-9 DecayMode2=-9 DataFile=ZHZZ6mu Interf=0 ghz1=0,0 ghz2=1,0
 
