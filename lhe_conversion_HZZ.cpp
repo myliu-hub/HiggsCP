@@ -1,7 +1,7 @@
 /*
-c++ -o read_01 `root-config --glibs --cflags` -lm read_01.cpp 
-./read_01 LHEfile.lhe
-*/
+   c++ -o read_01 `root-config --glibs --cflags` -lm read_01.cpp 
+   ./read_01 LHEfile.lhe
+ */
 
 #include <cmath>
 #include <vector>
@@ -19,415 +19,483 @@ using namespace std ;
 
 struct ptSort: public std::binary_function<TLorentzVector, TLorentzVector, bool>
 {
-  bool operator() (TLorentzVector x, TLorentzVector y)
+    bool operator() (TLorentzVector x, TLorentzVector y)
     {
-      return x.Pt () < y.Pt () ;
+        return x.Pt () < y.Pt () ;
     }
 } ;
 
+int Accepted(TLorentzVector& mu){
+    if(mu.Pt()>3 && mu.CosTheta()<0.85)
+      return 1;
+    else
+      return 0;
+}
+
+bool compareZmass(std::vector<TLorentzVector> &P4_H_Z,std::vector<TLorentzVector> &P4_H_Zs,std::vector<TLorentzVector> &P4_H_Z_Mup,std::vector<TLorentzVector> &P4_H_Z_Mum,std::vector<TLorentzVector> &P4_H_Zs_Mup,std::vector<TLorentzVector> &P4_H_Zs_Mum){
+    if(P4_H_Z.size()<2||P4_H_Z_Mup.size()<2||P4_H_Z_Mum.size()<2)
+      return false;
+    if(P4_H_Z.at(1).M()>P4_H_Z.at(0).M()){
+        P4_H_Zs.push_back(P4_H_Z.at(0));
+        P4_H_Z.erase(P4_H_Z.begin());
+        P4_H_Zs_Mup.push_back(P4_H_Z_Mup.at(0));
+        P4_H_Zs_Mum.push_back(P4_H_Z_Mum.at(0));
+        P4_H_Z_Mup.erase(P4_H_Z_Mup.begin());
+        P4_H_Z_Mum.erase(P4_H_Z_Mum.begin());
+    }
+    else{
+        P4_H_Zs.push_back(P4_H_Z.at(1));
+        P4_H_Z.erase(P4_H_Z.begin()+1);
+        P4_H_Zs_Mup.push_back(P4_H_Z_Mup.at(1));
+        P4_H_Zs_Mum.push_back(P4_H_Z_Mum.at(1));
+        P4_H_Z_Mup.erase(P4_H_Z_Mup.begin()+1);
+        P4_H_Z_Mum.erase(P4_H_Z_Mum.begin()+1);
+    }
+    return true;
+}
+
+double helicityAngle(TLorentzVector p4mother, TLorentzVector p4, TLorentzVector p4daughter){
+    TVector3 boost = -p4.BoostVector();
+    p4mother.Boost(boost);
+    p4daughter.Boost(boost);
+    TVector3 p3daughter= p4daughter.Vect();
+    TVector3 p3mother= p4mother.Vect();
+
+    return p3daughter.Dot(p3mother)/((p3daughter.Mag())*(p3mother.Mag()));
+}
+
+float helicityAimuthalAngle(TLorentzVector p4b1, TLorentzVector p4b2, TLorentzVector p4d1, TLorentzVector p4d2){
+
+    TLorentzVector p4m=p4d1+p4d2;
+    TVector3 zaxis=(p4m.Vect()).Unit();
+    TVector3 beta=(-1./p4m.E())*p4m.Vect();
+    p4d1.Boost(beta);
+    p4d2.Boost(beta);
+    p4b1.Boost(beta);
+    p4b2.Boost(beta);
+    TVector3 yaxis=((p4b1.Vect()).Cross(p4b2.Vect())).Unit();
+    TVector3 xaxis=(yaxis.Cross(zaxis)).Unit();
+    float phi= TMath::ATan2((p4d1.Vect()).Dot(yaxis),(p4d1.Vect()).Dot(xaxis));
+    return phi;
+}
+
 void computeAngles(TLorentzVector p4M11, 
-    TLorentzVector p4M12, 
-    TLorentzVector p4M21, 
-    TLorentzVector p4M22, 
-    TLorentzVector all, 
-    float& costhetastar, 
-    float& costheta1, 
-    float& costheta2, 
-    float& Phi, 
-    float& Phi1){
+            TLorentzVector p4M12, 
+            TLorentzVector p4M21, 
+            TLorentzVector p4M22, 
+            TLorentzVector p4M31,
+            TLorentzVector p4M32,
+            float& costhetastar, 
+            float& costheta1, 
+            float& costheta2, 
+            float& Phi, 
+            float& Phi1){
 
-      //build Z 4-vectors
-      TLorentzVector p4Z1 = p4M11 + p4M12;
-      TLorentzVector p4Z2 = p4M21 + p4M22;
+    //build Z 4-vectors
+    TLorentzVector p4Z1 = p4M11 + p4M12;
+    TLorentzVector p4Z2 = p4M21 + p4M22;
 
-      //build H 4-vectors
-      TLorentzVector p4H = p4Z1 + p4Z2; 
+    TLorentzVector p4Z = p4M31 + p4M32;    
 
-      // -----------------------------------
+    //build H 4-vectors
+    TLorentzVector p4H = p4Z1 + p4Z2; 
 
-      //costhetastar
-      TVector3 boostX = -(p4H.BoostVector());
-      TLorentzVector thep4Z1inXFrame( p4Z1 );
-      TLorentzVector thep4Z2inXFrame( p4Z2 );
-      thep4Z1inXFrame.Boost( boostX );
-      thep4Z2inXFrame.Boost( boostX );
-      TVector3 theZ1X_p3 = TVector3( thep4Z1inXFrame.X(), thep4Z1inXFrame.Y(), thep4Z1inXFrame.Z() );
-      TVector3 theZ2X_p3 = TVector3( thep4Z2inXFrame.X(), thep4Z2inXFrame.Y(), thep4Z2inXFrame.Z() );    
-      costhetastar = all.Vect().Dot(thep4Z1inXFrame.Vect())/(all.Vect().Mag()*thep4Z1inXFrame.Vect().Mag());
+    TLorentzVector p4E = p4Z + p4H;
+    TLorentzVector p4E_target(0-p4E.Px(),0-p4E.Py(),0-p4E.Pz(),p4E.E()); 
 
-      // --------------------------- costheta1
-      TVector3 boostV1 = -(p4Z1.BoostVector());
-      TLorentzVector p4M11_BV1( p4M11 );
-      TLorentzVector p4M12_BV1( p4M12 );
-      TLorentzVector p4M21_BV1( p4M21 );
-      TLorentzVector p4M22_BV1( p4M22 );
-      p4M11_BV1.Boost( boostV1 );
-      p4M12_BV1.Boost( boostV1 );
-      p4M21_BV1.Boost( boostV1 );
-      p4M22_BV1.Boost( boostV1 );
+    //build mother of H
+    TLorentzVector p4m(0,0,0,240);
 
-      TLorentzVector p4V2_BV1 = p4M21_BV1 + p4M22_BV1;
-      // costheta1
-      costheta1 = -p4V2_BV1.Vect().Dot( p4M11_BV1.Vect() )/p4V2_BV1.Vect().Mag()/p4M11_BV1.Vect().Mag();
+    // -----------------------------------
 
-      // --------------------------- costheta2
-      TVector3 boostV2 = -(p4Z2.BoostVector());
-      if (boostV2.Mag()>=1.) {
-        boostV2*=0.9999;
-      }
-      TLorentzVector p4M11_BV2( p4M11 );
-      TLorentzVector p4M12_BV2( p4M12 );
-      TLorentzVector p4M21_BV2( p4M21 );
-      TLorentzVector p4M22_BV2( p4M22 );
-      p4M11_BV2.Boost( boostV2 );
-      p4M12_BV2.Boost( boostV2 );
-      p4M21_BV2.Boost( boostV2 );
-      p4M22_BV2.Boost( boostV2 );
+    costhetastar=helicityAngle(p4m,p4H,p4Z1);
+    costheta1=p4Z.CosTheta();//helicityAngle(p4H,p4Z1,p4M11);
+    costheta2=helicityAngle(p4m,p4Z,p4M31);
+    TLorentzVector p4H_target(0.-p4H.Px(),0.-p4H.Py(),0.-p4H.Pz(),p4H.E());
+    Phi=helicityAimuthalAngle(p4E,p4E_target,p4M31,p4M32);
+    Phi1=helicityAimuthalAngle(p4H,p4H_target,p4M11,p4M12);
 
-      TLorentzVector p4V1_BV2 = p4M11_BV2 + p4M12_BV2;
-      // costheta2
-      costheta2 = -p4V1_BV2.Vect().Dot( p4M21_BV2.Vect() )/p4V1_BV2.Vect().Mag()/p4M21_BV2.Vect().Mag();
-
-      // --------------------------- Phi and Phi1 (old phistar1 - azimuthal production angle)
-      //    TVector3 boostX = -(thep4H.BoostVector());
-      TLorentzVector p4M11_BX( p4M11 );
-      TLorentzVector p4M12_BX( p4M12 );
-      TLorentzVector p4M21_BX( p4M21 );
-      TLorentzVector p4M22_BX( p4M22 );
-
-      p4M11_BX.Boost( boostX );
-      p4M12_BX.Boost( boostX );
-      p4M21_BX.Boost( boostX );
-      p4M22_BX.Boost( boostX );
-
-      TVector3 tmp1 = p4M11_BX.Vect().Cross( p4M12_BX.Vect() );
-      TVector3 tmp2 = p4M21_BX.Vect().Cross( p4M22_BX.Vect() );    
-
-      TVector3 normal1_BX( tmp1.X()/tmp1.Mag(), tmp1.Y()/tmp1.Mag(), tmp1.Z()/tmp1.Mag() ); 
-      TVector3 normal2_BX( tmp2.X()/tmp2.Mag(), tmp2.Y()/tmp2.Mag(), tmp2.Z()/tmp2.Mag() ); 
-
-      // Phi
-      TLorentzVector p4Z1_BX = p4M11_BX + p4M12_BX;    
-      float tmpSgnPhi = p4Z1_BX.Vect().Dot( normal1_BX.Cross( normal2_BX) );
-      float sgnPhi = tmpSgnPhi/fabs(tmpSgnPhi);
-      Phi = sgnPhi * acos( -1.*normal1_BX.Dot( normal2_BX) );
-
-      //////////////
-
-      //TVector3 beamAxis(0,0,1);
-      TVector3 beamAxis(all.Px()/all.Vect().Mag(),all.Py()/all.Vect().Mag(),all.Pz()/all.Vect().Mag());
-      TVector3 tmp3 = (p4M11_BX + p4M12_BX).Vect();
-
-      TVector3 p3V1_BX( tmp3.X()/tmp3.Mag(), tmp3.Y()/tmp3.Mag(), tmp3.Z()/tmp3.Mag() );
-      TVector3 tmp4 = beamAxis.Cross( p3V1_BX );
-      TVector3 normalSC_BX( tmp4.X()/tmp4.Mag(), tmp4.Y()/tmp4.Mag(), tmp4.Z()/tmp4.Mag() );
-
-      // Phi1
-      float tmpSgnPhi1 = p4Z1_BX.Vect().Dot( normal1_BX.Cross( normalSC_BX) );
-      float sgnPhi1 = tmpSgnPhi1/fabs(tmpSgnPhi1);    
-      Phi1 = sgnPhi1 * acos( normal1_BX.Dot( normalSC_BX) );    
 }
 
 
-int main (int argc, char **argv) {
+//int lhe_conversion_HZZ(TString argv="100kevt1000.lhe") {
+    int main (int argc, char **argv) {
 
-  // Open a stream connected to an event file:
-  if (argc < 2) exit (1) ;
-  std::ifstream ifs(argv[1]);
+    // Open a stream connected to an event file:
+      if (argc < 2) exit (1) ;
+    //std::ifstream ifs(argv);
+    std::ifstream ifs(argv[1]);
 
-  // Create the Reader object:
-  LHEF::Reader reader(ifs);
+    // Create the Reader object:
+    LHEF::Reader reader(ifs);
 
-  // Copy header and init blocks and write them out.
-  if ( reader.outsideBlock.length() ) std::cout << reader.outsideBlock;
+    // Copy header and init blocks and write them out.
+    if ( reader.outsideBlock.length() ) std::cout << reader.outsideBlock;
 
-  // Print out the header information:
-  std::cerr << reader.headerBlock;
+    // Print out the header information:
+    std::cerr << reader.headerBlock;
 
-  // Print out the addinional comments in the init block:
-  std::cerr << reader.initComments;
+    // Print out the addinional comments in the init block:
+    std::cerr << reader.initComments;
 
-  // Print out the beam energies:
-  std::cerr << "Beam A: " << reader.heprup.EBMUP.first << " GeV, Beam B: "
-            << reader.heprup.EBMUP.second << " GeV." << std::endl;
+    // Print out the beam energies:
+    std::cerr << "Beam A: " << reader.heprup.EBMUP.first << " GeV, Beam B: "
+        << reader.heprup.EBMUP.second << " GeV." << std::endl;
 
-  double weight;
-  int nparticles;
+    bool DEBUG=false;
+//    bool DEBUG=true;
+    double weight;
+    int nparticles;
 
-  std::vector<TLorentzVector> P4_ElectronPlus;
-  std::vector<TLorentzVector> P4_ElectronMinus;
-  std::vector<TLorentzVector> P4_Z;
-  std::vector<TLorentzVector> P4_Higgs;
-  std::vector<TLorentzVector> P4_MuonZPlus;
-  std::vector<TLorentzVector> P4_MuonZMinus;
-  std::vector<TLorentzVector> P4_Muon1Plus;
-  std::vector<TLorentzVector> P4_Muon1Minus;
-  std::vector<TLorentzVector> P4_Muon2Plus;
-  std::vector<TLorentzVector> P4_Muon2Minus;
+    //momentum for Z, H, Z (on shell), Zs (offshell) and the decays (muon)
+    std::vector< std::pair<int,TLorentzVector> >  P4_Particle;
+    std::vector<TLorentzVector> P4_Beamp;
+    std::vector<TLorentzVector> P4_Beamm;
+    std::vector<TLorentzVector> P4_Z;
+    std::vector<TLorentzVector> P4_H;
+    std::vector<TLorentzVector> P4_H_Z;
+    std::vector<TLorentzVector> P4_H_Zs;
+    std::vector<TLorentzVector> P4_Z_Mup;
+    std::vector<TLorentzVector> P4_Z_Mum;
+    std::vector<TLorentzVector> P4_H_Z_Mup;
+    std::vector<TLorentzVector> P4_H_Z_Mum;
+    std::vector<TLorentzVector> P4_H_Zs_Mup;
+    std::vector<TLorentzVector> P4_H_Zs_Mum;
 
-  double ElectronPlusPx, ElectronPlusPy, ElectronPlusPz, ElectronPlusE;
-  double ElectronMinusPx, ElectronMinusPy, ElectronMinusPz, ElectronMinusE;
-  double ZPx, ZPy, ZPz, ZE;
-  double HiggsPx, HiggsPy, HiggsPz, HiggsE;
-  double MuonZPlusPx, MuonZPlusPy, MuonZPlusPz, MuonZPlusE;
-  double MuonZMinusPx, MuonZMinusPy, MuonZMinusPz, MuonZMinusE;
-  double Muon1PlusPx, Muon1PlusPy, Muon1PlusPz, Muon1PlusE;
-  double Muon1MinusPx, Muon1MinusPy, Muon1MinusPz, Muon1MinusE;
-  double Muon2PlusPx, Muon2PlusPy, Muon2PlusPz, Muon2PlusE;
-  double Muon2MinusPx, Muon2MinusPy, Muon2MinusPz, Muon2MinusE;
+    double Px_Beamp, Py_Beamp, Pz_Beamp, E_Beamp; // e+
+    double Px_Beamm, Py_Beamm, Pz_Beamm, E_Beamm; // e-
+    double Px_Z, Py_Z, Pz_Z, E_Z, P_Z, M_Z, Pt_Z; // Z
+    double Px_H, Py_H, Pz_H, E_H, P_H, M_H, Pt_H; // Higgs
+    double Px_H_Z, Py_H_Z, Pz_H_Z, E_H_Z, P_H_Z, M_H_Z, Pt_H_Z; // Higgs->Z(on)
+    double Px_H_Zs, Py_H_Zs, Pz_H_Zs, E_H_Zs, P_H_Zs, M_H_Zs, Pt_H_Zs; // Higgs->Z(off)
+    double Px_Z_Mup, Py_Z_Mup, Pz_Z_Mup, E_Z_Mup, P_Z_Mup, M_Z_Mup, Pt_Z_Mup; // Z->mu(on)
+    double Px_Z_Mum, Py_Z_Mum, Pz_Z_Mum, E_Z_Mum, P_Z_Mum, M_Z_Mum, Pt_Z_Mum; // Z->mu(off)
+    double Px_H_Z_Mup, Py_H_Z_Mup, Pz_H_Z_Mup, E_H_Z_Mup; // Z(on)->mu(on)
+    double Px_H_Z_Mum, Py_H_Z_Mum, Pz_H_Z_Mum, E_H_Z_Mum; // Z(on)->mu(off)
+    double Px_H_Zs_Mup, Py_H_Zs_Mup, Pz_H_Zs_Mup, E_H_Zs_Mup; // Z(off)->mu(on)
+    double Px_H_Zs_Mum, Py_H_Zs_Mum, Pz_H_Zs_Mum, E_H_Zs_Mum; // Z(off)->mu(off)
+    float costheta1, costheta2, costhetas;
+    float costheta;
+    float phi, phi1;
 
-  TFile *outfile = new TFile("trial_HZZ.root","RECREATE");
-  TTree *out_tree = new TTree("trialTree","trialTree");
-  TH1D *m_higgs = new TH1D("m_higgs","m_higgs",40,123,127);
-  TH1D *m_Zboson = new TH1D("m_Zboson","m_Zboson",20,80,100);
-  TH1D *cos_theta1 = new TH1D("cos_theta1","cos_theta1",25,-1,1);
-  TH1D *cos_theta2 = new TH1D("cos_theta2","cos_theta2",25,-1,1);
-  TH1D *plot_phi = new TH1D("phi","phi",50,-3.2,3.2);
-  TLorentzVector Muon1Plus, Muon1Minus, Muon2Plus, Muon2Minus, MuonZPlus, MuonZMinus;
-  TLorentzVector Z, Higgs, ElectronPlus, ElectronMinus;
+    TFile *outfile = new TFile("trial_HZZ.root","RECREATE");
+    TTree *out_tree = new TTree("trialTree","trialTree");
+    TH1D *m_Higgs = new TH1D("m_Higgs","m_higgs",80,123,127); 
+    TH1D *m_Zboson = new TH1D("m_Zboson","m_Zboson",20,80,100);
+    TH1D *m_HZboson = new TH1D("m_HZboson","H->ZZstar",20,80,100);
+    TH1D *m_HZstar= new TH1D("m_HZstar","H->ZZstar",90,10,100);
+    TH1D *cos_theta1 = new TH1D("cos_theta1","cos_theta1",25,-1,1);
+    TH1D *cos_theta = new TH1D("cos_theta","cos_theta1 and cos_theta2",25,-1,1);
+    TH1D *cos_theta2 = new TH1D("cos_theta2","cos_theta2",25,-1,1);
+    TH1D *cos_thetastar = new TH1D("cos_thetastar","cos_thetastar",25,-1,1);
+    TH1D *plot_phi = new TH1D("phi","phi",50,-3.2,3.2);
+    TH1D *plot_phi1 = new TH1D("phi1","phi1",50,-3.2,3.2);
 
-  out_tree->Branch("weight",&weight,"weight/D");
-  out_tree->Branch("nparticles",&nparticles,"nparticles/I");
+    out_tree->Branch("weight",&weight,"weight/D");
+    out_tree->Branch("nparticles",&nparticles,"nparticles/I");
+    out_tree->Branch("costheta1",&costheta1,"costheta1/F");
+    out_tree->Branch("costheta2",&costheta2,"costheta2/F");
+    out_tree->Branch("costhetas",&costhetas,"costhetas/F");
+    out_tree->Branch("phi",&phi,"phi/F");
+    out_tree->Branch("phi1",&phi1,"phi1/F");
 
-  out_tree->Branch("ElectronPlusPx",&ElectronPlusPx,"ElectronPlusPx/D");
-  out_tree->Branch("ElectronPlusPy",&ElectronPlusPy,"ElectronPlusPy/D");
-  out_tree->Branch("ElectronPlusPz",&ElectronPlusPz,"ElectronPlusPz/D");
-  out_tree->Branch("ElectronPlusE",&ElectronPlusE,"ElectronPlusE/D");
+    // e+
+    out_tree->Branch("Px_Beamp",&Px_Beamp,"Px_Beamp/D");
+    out_tree->Branch("Py_Beamp",&Py_Beamp,"Py_Beamp/D");
+    out_tree->Branch("Pz_Beamp",&Pz_Beamp,"Pz_Beamp/D");
+    out_tree->Branch("E_Beamp",&E_Beamp,"E_Beamp/D");
 
-  out_tree->Branch("ElectronMinusPx",&ElectronMinusPx,"ElectronMinusPx/D");
-  out_tree->Branch("ElectronMinusPy",&ElectronMinusPy,"ElectronMinusPy/D");
-  out_tree->Branch("ElectronMinusPz",&ElectronMinusPz,"ElectronMinusPz/D");
-  out_tree->Branch("ElectronMinusE",&ElectronMinusE,"ElectronMinusE/D");
+    // e-
+    out_tree->Branch("Px_Beamm",&Px_Beamm,"Px_Beamm/D");
+    out_tree->Branch("Py_Beamm",&Py_Beamm,"Py_Beamm/D");
+    out_tree->Branch("Pz_Beamm",&Pz_Beamm,"Pz_Beamm/D");
+    out_tree->Branch("E_Beamm",&E_Beamm,"E_Beamm/D");
 
-  out_tree->Branch("ZPx",&ZPx,"ZPx/D");
-  out_tree->Branch("ZPy",&ZPy,"ZPy/D");
-  out_tree->Branch("ZPz",&ZPz,"ZPz/D");
-  out_tree->Branch("ZE",&ZE,"ZE/D");
+    // Z
+    out_tree->Branch("Px_Z",&Px_Z,"Px_Z/D");
+    out_tree->Branch("Py_Z",&Py_Z,"Py_Z/D");
+    out_tree->Branch("Pz_Z",&Pz_Z,"Pz_Z/D");
+    out_tree->Branch("E_Z",&E_Z,"E_Z/D");
+    out_tree->Branch("P_Z",&P_Z,"P_Z/D");
+    out_tree->Branch("M_Z",&M_Z,"M_Z/D");
+    out_tree->Branch("Pt_Z",&Pt_Z,"Pt_Z/D");
 
-  out_tree->Branch("HiggsPx",&HiggsPx,"HiggsPx/D");
-  out_tree->Branch("HiggsPy",&HiggsPy,"HiggsPy/D");
-  out_tree->Branch("HiggsPz",&HiggsPz,"HiggsPz/D");
-  out_tree->Branch("HiggsE",&HiggsE,"HiggsE/D");
+    // Higgs
+    out_tree->Branch("Px_H",&Px_H,"Px_H/D");
+    out_tree->Branch("Py_H",&Py_H,"Py_H/D");
+    out_tree->Branch("Pz_H",&Pz_H,"Pz_H/D");
+    out_tree->Branch("E_H",&E_H,"E_H/D");
+    out_tree->Branch("P_H",&P_H,"P_H/D");
+    out_tree->Branch("M_H",&M_H,"M_H/D");
+    out_tree->Branch("Pt_H",&Pt_H,"Pt_H/D");
 
-  out_tree->Branch("MuonZPlusPx",&MuonZPlusPx,"MuonZPlusPx/D");
-  out_tree->Branch("MuonZPlusPy",&MuonZPlusPy,"MuonZPlusPy/D");
-  out_tree->Branch("MuonZPlusPz",&MuonZPlusPz,"MuonZPlusPz/D");
-  out_tree->Branch("MuonZPlusE",&MuonZPlusE,"MuonZPlusE/D");
+    // Higgs->Z(on)
+    out_tree->Branch("Px_H_Z",&Px_H_Z,"Px_H_Z/D");
+    out_tree->Branch("Py_H_Z",&Py_H_Z,"Py_H_Z/D");
+    out_tree->Branch("Pz_H_Z",&Pz_H_Z,"Pz_H_Z/D");
+    out_tree->Branch("E_H_Z",&E_H_Z,"E_H_Z/D");
+    out_tree->Branch("P_H_Z",&P_H_Z,"P_H_Z/D");
+    out_tree->Branch("M_H_Z",&M_H_Z,"M_H_Z/D");
+    out_tree->Branch("Pt_H_Z",&Pt_H_Z,"Pt_H_Z/D");
 
-  out_tree->Branch("MuonZMinusPx",&MuonZMinusPx,"MuonZMinusPx/D");
-  out_tree->Branch("MuonZMinusPy",&MuonZMinusPy,"MuonZMinusPy/D");
-  out_tree->Branch("MuonZMinusPz",&MuonZMinusPz,"MuonZMinusPz/D");
-  out_tree->Branch("MuonZMinusE",&MuonZMinusE,"MuonZMinusE/D");
+    // Higgs->Z(off)
+    out_tree->Branch("Px_H_Zs",&Px_H_Zs,"Px_H_Zs/D");
+    out_tree->Branch("Py_H_Zs",&Py_H_Zs,"Py_H_Zs/D");
+    out_tree->Branch("Pz_H_Zs",&Pz_H_Zs,"Pz_H_Zs/D");
+    out_tree->Branch("E_H_Zs",&E_H_Zs,"E_H_Zs/D");
+    out_tree->Branch("P_H_Zs",&P_H_Zs,"P_H_Zs/D");
+    out_tree->Branch("M_H_Zs",&M_H_Zs,"M_H_Zs/D");
+    out_tree->Branch("Pt_H_Zs",&Pt_H_Zs,"Pt_H_Zs/D");
 
-  out_tree->Branch("Muon1PlusPx",&Muon1PlusPx,"Muon1PlusPx/D");
-  out_tree->Branch("Muon1PlusPy",&Muon1PlusPy,"Muon1PlusPy/D");
-  out_tree->Branch("Muon1PlusPz",&Muon1PlusPz,"Muon1PlusPz/D");
-  out_tree->Branch("Muon1PlusE",&Muon1PlusE,"Muon1PlusE/D");
+    // Z->mu(on)
+    out_tree->Branch("Px_Z_Mup",&Px_Z_Mup,"Px_Z_Mup/D");
+    out_tree->Branch("Py_Z_Mup",&Py_Z_Mup,"Py_Z_Mup/D");
+    out_tree->Branch("Pz_Z_Mup",&Pz_Z_Mup,"Pz_Z_Mup/D");
+    out_tree->Branch("E_Z_Mup",&E_Z_Mup,"E_Z_Mup/D");
+    out_tree->Branch("P_Z_Mup",&P_Z_Mup,"P_Z_Mup/D");
+    out_tree->Branch("M_Z_Mup",&M_Z_Mup,"M_Z_Mup/D");
+    out_tree->Branch("Pt_Z_Mup",&Pt_Z_Mup,"Pt_Z_Mup/D");
 
-  out_tree->Branch("Muon1MinusPx",&Muon1MinusPx,"Muon1MinusPx/D");
-  out_tree->Branch("Muon1MinusPy",&Muon1MinusPy,"Muon1MinusPy/D");
-  out_tree->Branch("Muon1MinusPz",&Muon1MinusPz,"Muon1MinusPz/D");
-  out_tree->Branch("Muon1MinusE",&Muon1MinusE,"Muon1MinusE/D");
+    // Z->mu(off)
+    out_tree->Branch("Px_Z_Mum",&Px_Z_Mum,"Px_Z_Mum/D");
+    out_tree->Branch("Py_Z_Mum",&Py_Z_Mum,"Py_Z_Mum/D");
+    out_tree->Branch("Pz_Z_Mum",&Pz_Z_Mum,"Pz_Z_Mum/D");
+    out_tree->Branch("E_Z_Mum",&E_Z_Mum,"E_Z_Mum/D");
+    out_tree->Branch("P_Z_Mum",&P_Z_Mum,"P_Z_Mum/D");
+    out_tree->Branch("M_Z_Mum",&M_Z_Mum,"M_Z_Mum/D");
+    out_tree->Branch("Pt_Z_Mum",&Pt_Z_Mum,"Pt_Z_Mum/D");
 
-  out_tree->Branch("Muon2PlusPx",&Muon2PlusPx,"Muon2PlusPx/D");
-  out_tree->Branch("Muon2PlusPy",&Muon2PlusPy,"Muon2PlusPy/D");
-  out_tree->Branch("Muon2PlusPz",&Muon2PlusPz,"Muon2PlusPz/D");
-  out_tree->Branch("Muon2PlusE",&Muon2PlusE,"Muon2PlusE/D");
+    // Z(on)->mu(on)
+    out_tree->Branch("Px_H_Z_Mup",&Px_H_Z_Mup,"Px_H_Z_Mup/D");
+    out_tree->Branch("Py_H_Z_Mup",&Py_H_Z_Mup,"Py_H_Z_Mup/D");
+    out_tree->Branch("Pz_H_Z_Mup",&Pz_H_Z_Mup,"Pz_H_Z_Mup/D");
+    out_tree->Branch("E_H_Z_Mup",&E_H_Z_Mup,"E_H_Z_Mup/D");
 
-  out_tree->Branch("Muon2MinusPx",&Muon2MinusPx,"Muon2MinusPx/D");
-  out_tree->Branch("Muon2MinusPy",&Muon2MinusPy,"Muon2MinusPy/D");
-  out_tree->Branch("Muon2MinusPz",&Muon2MinusPz,"Muon2MinusPz/D");
-  out_tree->Branch("Muon2MinusE",&Muon2MinusE,"Muon2MinusE/D");
+    // Z(on)->mu(off)
+    out_tree->Branch("Px_H_Z_Mum",&Px_H_Z_Mum,"Px_H_Z_Mum/D");
+    out_tree->Branch("Py_H_Z_Mum",&Py_H_Z_Mum,"Py_H_Z_Mum/D");
+    out_tree->Branch("Pz_H_Z_Mum",&Pz_H_Z_Mum,"Pz_H_Z_Mum/D");
+    out_tree->Branch("E_H_Z_Mum",&E_H_Z_Mum,"E_H_Z_Mum/D");
 
-  P4_ElectronPlus.clear();
-  P4_ElectronMinus.clear();
-  P4_Z.clear();
-  P4_Higgs.clear();
-  P4_MuonZPlus.clear();
-  P4_MuonZMinus.clear();
-  P4_Muon1Plus.clear();
-  P4_Muon1Minus.clear();
-  P4_Muon2Plus.clear();
-  P4_Muon2Minus.clear();
+    // Z(off)->mu(on)
+    out_tree->Branch("Px_H_Zs_Mup",&Px_H_Zs_Mup,"Px_H_Zs_Mup/D");
+    out_tree->Branch("Py_H_Zs_Mup",&Py_H_Zs_Mup,"Py_H_Zs_Mup/D");
+    out_tree->Branch("Pz_H_Zs_Mup",&Pz_H_Zs_Mup,"Pz_H_Zs_Mup/D");
+    out_tree->Branch("E_H_Zs_Mup",&E_H_Zs_Mup,"E_H_Zs_Mup/D");
 
-  // Now loop over all events:
-  long ieve = 0;
-  while ( reader.readEvent() ) 
+    // Z(off)->mu(off)
+    out_tree->Branch("Px_H_Zs_Mum",&Px_H_Zs_Mum,"Px_H_Zs_Mum/D");
+    out_tree->Branch("Py_H_Zs_Mum",&Py_H_Zs_Mum,"Py_H_Zs_Mum/D");
+    out_tree->Branch("Pz_H_Zs_Mum",&Pz_H_Zs_Mum,"Pz_H_Zs_Mum/D");
+    out_tree->Branch("E_H_Zs_Mum",&E_H_Zs_Mum,"E_H_Zs_Mum/D");
+
+
+    // Now loop over all events:
+    long ieve = 0;
+    while ( reader.readEvent() ) 
     {
-      ++ieve;
-      if (ieve % 100 == 0) std::cerr << "event " << ieve << "\n" ;
-  
-      int MuonPlus_Counter=0, MuonMinus_Counter=0;
-      //PG loop over particles in the event
-      for (int iPart = 0 ; iPart < reader.hepeup.IDUP.size (); iPart++)
+        ++ieve;
+        if (ieve % 100 == 0) std::cerr << "event " << ieve << "\n" ;
+
+        P4_Particle.clear();
+        P4_Beamp.clear();
+        P4_Beamm.clear();
+        P4_Z.clear();
+        P4_H.clear();
+        P4_H_Z.clear();
+        P4_H_Zs.clear();
+        P4_Z_Mup.clear();
+        P4_Z_Mum.clear();
+        P4_H_Z_Mup.clear();
+        P4_H_Z_Mum.clear();
+        P4_H_Zs_Mup.clear();
+        P4_H_Zs_Mum.clear();
+        //PG loop over particles in the event
+        for (int iPart = 0 ; iPart < reader.hepeup.IDUP.size (); iPart++)
         {  
 
-          //if (reader.hepeup.ISTUP.at (iPart) < 0) continue ;  // for removing initial particle beams
+            //if (reader.hepeup.ISTUP.at (iPart) < 0) continue ;  // for removing initial particle beams
 
-          int type = reader.hepeup.IDUP.at (iPart) ;
-          TLorentzVector particle 
-             (
-               reader.hepeup.PUP.at (iPart).at (0), //PG px
-               reader.hepeup.PUP.at (iPart).at (1), //PG py
-               reader.hepeup.PUP.at (iPart).at (2), //PG pz
-               reader.hepeup.PUP.at (iPart).at (3)  //PG E
-             ) ;
+            int type = reader.hepeup.IDUP.at (iPart) ;
+            int mother=reader.hepeup.MOTHUP.at(iPart).first;
+            TLorentzVector particle 
+                (
+                 reader.hepeup.PUP.at (iPart).at (0), //PG px
+                 reader.hepeup.PUP.at (iPart).at (1), //PG py
+                 reader.hepeup.PUP.at (iPart).at (2), //PG pz
+                 reader.hepeup.PUP.at (iPart).at (3)  //PG E
+                ) ;
 
-          weight = reader.hepeup.XWGTUP;
-          nparticles = reader.hepeup.NUP;
- 
-          if (type == -11){ 
-            P4_ElectronPlus.push_back(particle) ;
-            ElectronPlus = particle;
-            ElectronPlusPx = particle.Px();
-            ElectronPlusPy = particle.Py();
-            ElectronPlusPz = particle.Pz();
-            ElectronPlusE = particle.E();
-            continue;
+            weight = reader.hepeup.XWGTUP;
+            nparticles = reader.hepeup.NUP;
+            if(DEBUG)
+                std::cout<<"pdgid "<<type<<" "<<mother<<" "<<particle.E()<<" "<<particle.M()<<std::endl;
+            P4_Particle.push_back(std::make_pair(type,particle)) ;
+            if (type == -11){
+                P4_Beamp.push_back(particle) ;
+                Px_Beamp= particle.Px();
+                Py_Beamp= particle.Py();
+                Pz_Beamp= particle.Pz();
+                E_Beamp= particle.E();
+                continue;
             }//positron
 
-          if (type == 11){ 
-            P4_ElectronMinus.push_back(particle);
-            ElectronMinus = particle;
-            ElectronMinusPx = particle.Px();
-            ElectronMinusPy = particle.Py();
-            ElectronMinusPz = particle.Pz();
-            ElectronMinusE = particle.E();
-            continue;
-          }//electron
+            if (type == 11){ 
+                P4_Beamm.push_back(particle) ;
+                Px_Beamm= particle.Px();
+                Py_Beamm= particle.Py();
+                Pz_Beamm= particle.Pz();
+                E_Beamm= particle.E();
+                continue;
+            }//electron
 
-          if (type == 23){ 
-            P4_Z.push_back(particle);
-            Z = particle;
-            ZPx = particle.Px();
-            ZPy = particle.Py();
-            ZPz = particle.Pz();
-            ZE = particle.E();
-            m_Zboson->Fill(particle.M(),weight);
-            continue;
-          }
+            if (type == 23 && fabs(P4_Particle.at(mother-1).first) == 11){ 
+                P4_Z.push_back(particle);
+                Px_Z = particle.Px();
+                Py_Z = particle.Py();
+                Pz_Z = particle.Pz();
+                E_Z = particle.E();
+                P_Z = sqrt(Px_Z*Px_Z+Py_Z*Py_Z+Pz_Z*Pz_Z);
+                M_Z = sqrt(E_Z*E_Z-P_Z*P_Z);
+                Pt_Z = sqrt(Px_Z*Px_Z+Py_Z*Py_Z);
+                continue;
+	    } // Z
 
-          if (type == 25){ 
-            P4_Higgs.push_back(particle) ;
-            Higgs = particle;
-            HiggsPx = particle.Px();
-            HiggsPy = particle.Py();
-            HiggsPz = particle.Pz();
-            HiggsE = particle.E();
-            m_higgs->Fill(particle.M(),weight);
-            continue;
-          }           
+            if (type == 25 && fabs(P4_Particle.at(mother-1).first) == 11){ 
+                P4_H.push_back(particle) ;
+                Px_H = particle.Px();
+                Py_H = particle.Py();
+                Pz_H = particle.Pz();
+                E_H = particle.E();
+                P_H = sqrt(Px_H*Px_H+Py_H*Py_H+Pz_H*Pz_H);
+                M_H = sqrt(E_H*E_H-P_H*P_H);
+                Pt_H = sqrt(Px_H*Px_H+Py_H*Py_H);
+                continue;
+            } // Higgs
 
-          if (type == -13 && MuonPlus_Counter==0){ 
-            P4_MuonZPlus.push_back(particle) ;
-            MuonZPlus = particle;
-            MuonZPlusPx = particle.Px();
-            MuonZPlusPy = particle.Py();
-            MuonZPlusPz = particle.Pz();
-            MuonZPlusE = particle.E();
-            MuonPlus_Counter=1;
-            continue;
-          }
+            if (type == -13 && P4_Particle.at(mother-1).first == 23 &&P4_Z_Mup.size()==0){ 
+                P4_Z_Mup.push_back(particle) ;
+                Px_Z_Mup = particle.Px();
+                Py_Z_Mup = particle.Py();
+                Pz_Z_Mup = particle.Pz();
+                E_Z_Mup = particle.E();
+                P_Z_Mup = sqrt(Px_Z_Mup*Px_Z_Mup+Py_Z_Mup*Py_Z_Mup+Pz_Z_Mup*Pz_Z_Mup);
+                M_Z_Mup = sqrt(E_Z_Mup*E_Z_Mup-P_Z_Mup*P_Z_Mup);
+                Pt_Z_Mup = sqrt(Px_Z_Mup*Px_Z_Mup+Py_Z_Mup*Py_Z_Mup);
+                continue;
+            } // Z->mu(on)
 
-          if (type == 13 && MuonMinus_Counter==0){ 
-            P4_MuonZMinus.push_back(particle) ;
-            MuonZMinus = particle;
-            MuonZMinusPx = particle.Px();
-            MuonZMinusPy = particle.Py();
-            MuonZMinusPz = particle.Pz();
-            MuonZMinusE = particle.E();
-            MuonMinus_Counter=1;
-            continue;
-          }
+            if (type == 13 && P4_Particle.at(mother-1).first == 23 &&P4_Z_Mum.size()==0){ 
+                P4_Z_Mum.push_back(particle) ;
+                Px_Z_Mum = particle.Px();
+                Py_Z_Mum = particle.Py();
+                Pz_Z_Mum = particle.Pz();
+                E_Z_Mum = particle.E();
+                P_Z_Mum = sqrt(Px_Z_Mum*Px_Z_Mum+Py_Z_Mum*Py_Z_Mum+Pz_Z_Mum*Pz_Z_Mum);
+                M_Z_Mum = sqrt(E_Z_Mum*E_Z_Mum-P_Z_Mum*P_Z_Mum);
+                Pt_Z_Mum = sqrt(Px_Z_Mum*Px_Z_Mum+Py_Z_Mum*Py_Z_Mum);
+                continue;
+            } // Z->mu(off)
 
-          if (type == -13 && MuonPlus_Counter==1){    
-            P4_Muon1Plus.push_back(particle) ;
-            Muon1Plus = particle;
-            Muon1PlusPx = particle.Px();
-            Muon1PlusPy = particle.Py();
-            Muon1PlusPz = particle.Pz();
-            Muon1PlusE = particle.E();
-            MuonPlus_Counter=2;
-            continue;
-          }
+            if (type == 23 && P4_Particle.at(mother-1).first == 25){ 
+                P4_H_Z.push_back(particle) ;
+                continue;
+            }
 
-          if (type == 13 && MuonMinus_Counter==1){
-            P4_Muon1Minus.push_back(particle) ;
-            Muon1Minus = particle;
-            Muon1MinusPx = particle.Px();
-            Muon1MinusPy = particle.Py();
-            Muon1MinusPz = particle.Pz();
-            Muon1MinusE = particle.E();
-            MuonMinus_Counter=2;
-            continue;
-          }
+            if (type == -13 && P4_Particle.at(mother-1).first == 23 && P4_Z_Mup.size()>0){ 
+                P4_H_Z_Mup.push_back(particle) ;
+                continue;
+            }
 
-          if (type == -13 && MuonPlus_Counter==2){    
-            P4_Muon2Plus.push_back(particle) ;
-            Muon2Plus = particle;
-            Muon2PlusPx = particle.Px();
-            Muon2PlusPy = particle.Py();
-            Muon2PlusPz = particle.Pz();
-            Muon2PlusE = particle.E();
-            MuonPlus_Counter=3;
-            continue;
-          }
+            if (type == 13 && P4_Particle.at(mother-1).first == 23 && P4_Z_Mum.size()>0){ 
+                P4_H_Z_Mum.push_back(particle) ;
+                continue;
+            }
 
-          if (type == 13 && MuonMinus_Counter==2){
-            P4_Muon2Minus.push_back(particle) ;
-            Muon2Minus = particle;
-            Muon2MinusPx = particle.Px();
-            Muon2MinusPy = particle.Py();
-            Muon2MinusPz = particle.Pz();
-            Muon2MinusE = particle.E();
-            MuonMinus_Counter=3;
-            continue;
-          }
 
-      } //PG loop over particles in the event
+        } //PG loop over particles in the event
+        if(!(compareZmass(P4_H_Z,P4_H_Zs,P4_H_Z_Mup,P4_H_Z_Mum,P4_H_Zs_Mup,P4_H_Zs_Mum)))std::cerr<<"ERROR: only found "<<P4_H_Z.size()<<" Z"<<std::endl;
+        Px_H_Z=P4_H_Z.at(0).Px();
+        Py_H_Z=P4_H_Z.at(0).Py();
+        Pz_H_Z=P4_H_Z.at(0).Pz();
+        E_H_Z=P4_H_Z.at(0).E();
 
-    TLorentzVector null;
-    float costhetastar;
-    float costheta1, costheta2;
-    float Phi, Phi1;
-    computeAngles(Muon1Plus, Muon1Minus, Muon2Plus, Muon2Minus, null, costhetastar, costheta1, costheta2, Phi, Phi1);
-    cos_theta1->Fill(costheta1,weight);
-    cos_theta2->Fill(costheta2,weight);
-    plot_phi->Fill(Phi,weight);
+        P_H_Z = sqrt(Px_H_Z*Px_H_Z+Py_H_Z*Py_H_Z+Pz_H_Z*Pz_H_Z);
+        M_H_Z = sqrt(E_H_Z*E_H_Z-P_H_Z*P_H_Z);
+        Pt_H_Z = sqrt(Px_H_Z*Px_H_Z+Py_H_Z*Py_H_Z);
 
-    out_tree->Fill();
+        Px_H_Zs=P4_H_Zs.at(0).Px();
+        Py_H_Zs=P4_H_Zs.at(0).Py();
+        Pz_H_Zs=P4_H_Zs.at(0).Pz();
+        E_H_Zs=P4_H_Zs.at(0).E();
+
+        P_H_Zs = sqrt(Px_H_Zs*Px_H_Zs+Py_H_Zs*Py_H_Zs+Pz_H_Zs*Pz_H_Zs);
+        M_H_Zs = sqrt(E_H_Zs*E_H_Zs-P_H_Zs*P_H_Zs);
+        Pt_H_Zs = sqrt(Px_H_Zs*Px_H_Zs+Py_H_Zs*Py_H_Zs);
+
+        Px_H_Z_Mup=P4_H_Z_Mup.at(0).Px();
+        Py_H_Z_Mup=P4_H_Z_Mup.at(0).Py();
+        Pz_H_Z_Mup=P4_H_Z_Mup.at(0).Pz();
+        E_H_Z_Mup=P4_H_Z_Mup.at(0).E();
+        Px_H_Z_Mum=P4_H_Z_Mum.at(0).Px();
+        Py_H_Z_Mum=P4_H_Z_Mum.at(0).Py();
+        Pz_H_Z_Mum=P4_H_Z_Mum.at(0).Pz();
+        E_H_Z_Mum=P4_H_Z_Mum.at(0).E();
+        Px_H_Zs_Mup=P4_H_Zs_Mup.at(0).Px();
+        Py_H_Zs_Mup=P4_H_Zs_Mup.at(0).Py();
+        Pz_H_Zs_Mup=P4_H_Zs_Mup.at(0).Pz();
+        E_H_Zs_Mup=P4_H_Zs_Mup.at(0).E();
+        Px_H_Zs_Mum=P4_H_Zs_Mum.at(0).Px();
+        Py_H_Zs_Mum=P4_H_Zs_Mum.at(0).Py();
+        Pz_H_Zs_Mum=P4_H_Zs_Mum.at(0).Pz();
+        E_H_Zs_Mum=P4_H_Zs_Mum.at(0).E();
+        if(DEBUG)
+          std::cout<<" mass "<<P4_Z.at(0).M()<<" "<<P4_H.at(0).M()<<" "<<P4_H_Z.at(0).M()<<" "<<P4_H_Zs.at(0).M()<<" "<<P4_Z_Mup.at(0).M()<<" "<<P4_Z_Mum.at(0).M()<<" "<<P4_H_Z_Mup.at(0).M()<<" "<<P4_H_Z_Mum.at(0).M()<<" "<<P4_H_Zs_Mup.at(0).M()<<" "<<P4_H_Zs_Mum.at(0).M()<<std::endl;
+        if((Accepted(P4_H_Z_Mup.at(0))+Accepted(P4_H_Z_Mum.at(0))+Accepted(P4_H_Zs_Mup.at(0))+Accepted(P4_H_Zs_Mum.at(0)))<3)
+          continue;
+
+        computeAngles(P4_H_Z_Mup.at(0), P4_H_Z_Mum.at(0), P4_H_Zs_Mup.at(0), P4_H_Zs_Mum.at(0), P4_Z_Mup.at(0),P4_Z_Mum.at(0), costhetas, costheta1, costheta2, phi, phi1);
+        m_Higgs->Fill((P4_H_Z_Mup.at(0)+P4_H_Z_Mum.at(0)+P4_H_Zs_Mup.at(0)+P4_H_Zs_Mum.at(0)).M(),weight);
+        m_Zboson->Fill((P4_Z_Mup.at(0)+P4_Z_Mum.at(0)).M(),weight);
+        m_HZboson->Fill((P4_H_Z_Mup.at(0)+P4_H_Z_Mum.at(0)).M(),weight);
+        m_HZstar->Fill((P4_H_Zs_Mup.at(0)+P4_H_Zs_Mum.at(0)).M(),weight);
+        //m_Higgs->Fill(P4_H.at(0).M(),weight);
+        //m_Zboson->Fill(P4_Z.at(0).M(),weight);
+        //m_HZboson->Fill(P4_H_Z.at(0).M(),weight);
+        //m_HZstar->Fill(P4_H_Zs.at(0).M(),weight);
+        if(DEBUG)
+        std::cout<<P4_H_Zs.at(0).M()<<std::endl;
+        cos_theta1->Fill(costheta1,weight);
+        cos_theta->Fill(costheta1,weight/2.);
+        cos_theta->Fill(costheta2,weight/2.);
+        cos_theta2->Fill(costheta2,weight);
+        cos_thetastar->Fill(costhetas,weight);
+        plot_phi->Fill(phi,weight);
+        plot_phi1->Fill(phi1,weight);
+
+        out_tree->Fill();
 
     } // Now loop over all events
 
-  cos_theta1->Draw();
-  cos_theta2->Draw();
-  plot_phi->Draw();
-  m_Zboson->Draw();
-  m_higgs->Draw();
-  outfile->Write();
-  outfile->Close();
-  // Now we are done.
-  return 0 ;
+    outfile->Write();
+    outfile->Close();
+    // Now we are done.
+    return 0 ;
 }
 
 /*
-
-TCanvas c2
-gStyle->SetPalette (1)
-
-
-.L ReverseCumultive.C 
-
-void ReverseCumulative (TH1* histo) 
-{
-  double integral = histo->GetBinContent (histo->GetNbinsX ()) ;
-  for (int iBin = 0; iBin < histo->GetNbinsX (); iBin++) 
-    {
-     Êdouble value = histo->GetBinContent (iBin+1) ;
-     Êhisto->SetBinContent (iBin+1, integral - value) ; 
-    }
-}
-
-gStyle->SetPalette (1)
-.L TH2FCumulative.C 
-*/
+   TCanvas c2
+   gStyle->SetPalette (1)
+   .L ReverseCumultive.C 
+   void ReverseCumulative (TH1* histo) 
+   {
+   double integral = histo->GetBinContent (histo->GetNbinsX ()) ;
+   for (int iBin = 0; iBin < histo->GetNbinsX (); iBin++) 
+   {
+   ÃŠdouble value = histo->GetBinContent (iBin+1) ;
+   ÃŠhisto->SetBinContent (iBin+1, integral - value) ; 
+   }
+   }
+   gStyle->SetPalette (1)
+   .L TH2FCumulative.C 
+ */
