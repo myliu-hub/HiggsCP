@@ -95,7 +95,7 @@ void computeAngles(TLorentzVector p4M11,
     TLorentzVector p4Z1 = p4M11 + p4M12;
     TLorentzVector p4Z2 = p4M21 + p4M22;
 
-    TLorentzVector p4Z = p4M31 + p4M32;    
+    TLorentzVector p4Z = p4M31 + p4M32;
 
     //build H 4-vectors
     TLorentzVector p4H = p4Z1 + p4Z2; 
