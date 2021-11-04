@@ -12,6 +12,7 @@ usage() {
 	printf "\nOPTIONS\n" 
         printf "\n\t%-9s  %-40s"  "1"      "[Run HZZ channel]"
         printf "\n\t%-9s  %-40s"  "2"      "[Run ZH channel]"
+        printf "\n\t%-9s  %-40s"  "3"      "[Run Delphes]"
         printf "\n\n"
 	printf "\nDATE\n"
 	printf "\n\t%-5s\n" "Janurary 2021" 
@@ -31,6 +32,12 @@ usage_2() {
         printf "\n\t%-9s  %-40s"  "2.2"      "[ZH CP odd channel]"
         printf "\n\t%-9s  %-40s"  "2.3"      "[ZH BSM CP even channel]"
         printf "\n\t%-9s  %-40s"  "2.4"      "[BDT classification]"
+}
+
+usage_3() {
+        printf "\n"
+        printf "\n\t%-9s  %-40s"  "3.1"      "[An example of running Delphes]"
+        printf "\n\t%-9s  %-40s"  "3.2"      "[Run Data in batches using Delphes]"
 }
 
 usage_1_1() {
@@ -74,6 +81,20 @@ usage_2_3() {
         printf "\n\t%-9s  %-40s"  "2.3.1"      "[Please run the JHU generator and name the output as 'outfile_HZZ_BSM_CPeven.lhe' ]"
         printf "\n\t%-9s  %-40s"  "2.3.2"      "[Compile the root conversion script]"
         printf "\n\t%-9s  %-40s"  "2.3.3"      "[Convert lhe file into root file]"
+}
+
+usage_3_1() {
+        printf "\n"
+        printf "\n\t%-9s  %-40s"  "3.1.1"      "[Setting up the environment of Delphes]"
+        printf "\n\t%-9s  %-40s"  "3.1.2"      "[source Delphes operating environment]"
+        printf "\n\t%-9s  %-40s"  "3.1.3"      "[Use Delphes to add the CEPC detector effect to the data]"
+}
+
+usage_3_2() {
+        printf "\n"
+        printf "\n\t%-9s  %-40s"  "3.2.1"      "[Get a list of directories for data]"
+        printf "\n\t%-9s  %-40s"  "3.2.2"      "[Get all data files]"
+        printf "\n\t%-9s  %-40s"  "3.2.3"      "[Submit batch job]"
 }
 
 if [[ $# -eq 0 ]]; then
@@ -202,6 +223,57 @@ case $option in
     esac
 }
 
+    # --------------------------------------------------------------------------
+    #  3.1 An example of running Delphes
+    # --------------------------------------------------------------------------
+
+sub_3_1(){
+case $option in
+
+    3.1) echo "An example of running Delphes"
+         ;;
+
+    3.1.1) echo "Setting up the environment of Delphes"
+           source /cvmfs/sft.cern.ch/lcg/views/LCG_99/x86_64-centos7-gcc10-opt/setup.sh
+           ;;
+
+    3.1.2) echo "source Delphes operating environment"
+           source /scratchfs/bes/myliu/Delphes/DelphesEnv.sh
+           ;;
+
+    3.1.3) echo "Use Delphes to add the CEPC detector effect to the data"
+           /scratchfs/bes/myliu/Delphes/DelphesSTDHEP /scratchfs/bes/myliu/Delphes/cards/delphes_card_CEPC.tcl /cefs/higgs/myliu/Higgs_CP_Data/Example/delphes_output_higgs.root /cefs/data/stdhep/CEPC240/higgs/E240.Pe1e1h_X.e0.p0.whizard195/e1e1h_X.e0.p0.00001.stdhep
+          ;;
+
+    esac
+}
+
+sub_3_2(){
+case $option in
+
+    3.2) echo "Run Data in batches using Delphes"
+         ;;
+
+    3.2.1) echo "Get a list of directories for data"
+           ls /cefs/data/stdhep/CEPC240/higgs/ >jobs/txt/Dir_higgs.txt
+           mkdir jobs/Higgs
+           ;;
+
+    3.2.2) echo "Get all data files"
+           cd /scratchfs/bes/myliu/Liumy/HiggsCP/jobs
+           ./FileList.sh
+           ls /scratchfs/bes/myliu/Liumy/HiggsCP/jobs/Higgs/* >/scratchfs/bes/myliu/Liumy/HiggsCP/jobs/txt/File_higgs.txt
+           ;;
+
+    3.2.3) echo "Submit batch job"
+           cd /scratchfs/bes/myliu/Liumy/HiggsCP/jobs
+           #./Stand_job.sh
+           ./Sub_all.sh
+           ;;
+
+   esac
+}
+
 sub_1(){
 case $option in 
 # sample: 1.1 is print detail information about each step and then you can run the step you want.
@@ -297,6 +369,33 @@ case $option in
 esac
 }
 
+sub_3(){
+case $option in
+
+    3.1) echo "An example of running Delphes"
+        usage_3_1
+        echo "Please enter your option: " 
+        read option
+        sub_3_1 option
+        ;;
+
+    3.1.*) echo "An example of running Delphes"
+        sub_3_1 option
+        ;;
+    3.2) echo "Run Data in batches using Delphes"
+         usage_3_2
+         echo "Please enter your option: "
+         read option
+         sub_3_2 option
+         ;;
+    3.2.*) echo "Run Data in batches using Delphes"
+         sub_3_2 option
+         ;;
+
+esac
+}
+
+
 case $option in
     1) echo "run HZZ"
        usage_1
@@ -316,6 +415,15 @@ case $option in
         ;;
     2.*) echo "run ZH"
        sub_2 option
+        ;;
+    3) echo "Run Delphes"
+       usage_3
+       echo "Please enter your option: "
+       read option
+       sub_3 option
+        ;;
+    3.*) echo "Run Delphes"
+       sub_3 option
         ;;
 
 esac
