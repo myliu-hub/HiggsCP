@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-import ROOT 
+import ROOT
 import joblib
 
 import imblearn
@@ -20,9 +20,22 @@ from sklearn import datasets
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.datasets import make_classification
-from sklearn.metrics import classification_report, roc_auc_score
+from sklearn.metrics import classification_report, roc_auc_score,accuracy_score
 from sklearn.metrics import roc_curve, auc
 from sklearn.model_selection import train_test_split
+
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import learning_curve
+from sklearn.model_selection import ShuffleSplit
+from sklearn.svm import SVC
+
+
+import xgboost as xgb
 
 def usage():
 	print ('test usage')
@@ -47,31 +60,47 @@ def main():
     print ('part1')   
 
     # get root files and convert them to array
-    branch_names = """ZPx,ZPy,ZPz,ZE,HiggsPx,HiggsPy,HiggsPz,HiggsE,MuonZPlusPx,MuonZPlusPy,MuonZPlusPz,MuonZPlusE,MuonZMinusPx,MuonZMinusPy,MuonZMinusPz,MuonZMinusE,Muon1PlusPx,Muon1PlusPy,Muon1PlusPz,Muon1PlusE,Muon1MinusPx,Muon1MinusPy,Muon1MinusPz,Muon1MinusE,Muon2PlusPx,Muon2PlusPy,Muon2PlusPz,Muon2PlusE,Muon2MinusPx,Muon2MinusPy,Muon2MinusPz,Muon2MinusE""".split(",")
-#    branch_names = """ZPx,ZPy,ZPz,ZE,HiggsPx,HiggsPy,HiggsPz,HiggsE""".split(",")
-#    branch_names = """MuonZPlusPx,MuonZPlusPy,MuonZPlusPz,MuonZPlusE,MuonZMinusPx,MuonZMinusPy,MuonZMinusPz,MuonZMinusE,Muon1PlusPx,Muon1PlusPy,Muon1PlusPz,Muon1PlusE,Muon1MinusPx,Muon1MinusPy,Muon1MinusPz,Muon1MinusE,Muon2PlusPx,Muon2PlusPy,Muon2PlusPz,Muon2PlusE,Muon2MinusPx,Muon2MinusPy,Muon2MinusPz,Muon2MinusE""".split(",")
+    #branch_names = """Px_Z,Py_Z,Pz_Z,E_Z,Px_H,Py_H,Pz_H,E_H,Px_H_Z,Py_H_Z,Pz_H_Z,E_H_Z,Px_H_Zs,Py_H_Zs,Pz_H_Zs,E_H_Zs,Px_Z_Mup,Py_Z_Mup,Pz_Z_Mup,E_Z_Mup,Px_Z_Mum,Py_Z_Mum,Pz_Z_Mum,E_Z_Mum,Px_H_Z_Mup,Py_H_Z_Mup,Pz_H_Z_Mup,E_H_Z_Mup,Px_H_Z_Mum,Py_H_Z_Mum,Pz_H_Z_Mum,E_H_Z_Mum""".split(",")
+    #branch_names = """Px_Z,Py_Z,Pz_Z,E_Z,Px_H,Py_H,Pz_H,E_H""".split(",")
+    #branch_names = """costheta1,costheta2,phi,M_H,M_Z,M_H_Z,M_H_Zs,M_Z_Mup,M_Z_Mum""".split(",")
+    #branch_names = """costheta1,costheta2,phi,phi1,costheta1_H,costheta2_H,phi_H""".split(",")
+    #branch_names = """costheta1,costheta2,phi,P_H_Z,P_H_Zs,P_Z_Mup,P_Z_Mum,Px_Z,Py_Z,Pz_Z,Px_H,Py_H,Pz_H""".split(",")  #The last selected feature for training the truth value
+    branch_names = """costheta1,costheta2,Px_H,Py_H,Pz_H,Px_Z,Py_Z,Pz_Z,Px_Z_Mup,Py_Z_Mup,Pz_Z_Mup,Pz_Z_Mup,E_Z_Mup,Px_Z_Mum,Py_Z_Mum,Pz_Z_Mum,E_Z_Mum""".split(",") # new sample
+#    branch_names = """Px_Beamp,Py_Beamp,Pz_Beamp,E_Beamp,Px_Beamm,Py_Beamm,Pz_Beamm,E_Beamm,Px_Z,Py_Z,Pz_Z,E_Z,Px_H,Py_H,Pz_H,E_H,Px_H_Z,Py_H_Z,Pz_H_Z,E_H_Z,Px_H_Zs,Py_H_Zs,Pz_H_Zs,E_H_Zs,Px_Z_Mup,Py_Z_Mup,Pz_Z_Mup,E_Z_Mup,Px_Z_Mum,Py_Z_Mum,Pz_Z_Mum,E_Z_Mum,Px_H_Z_Mup,Py_H_Z_Mup,Pz_H_Z_Mup,E_H_Z_Mup,Px_H_Z_Mum,Py_H_Z_Mum,Pz_H_Z_Mum,E_H_Z_Mum""".split(",")
 
     fin1 = ROOT.TFile(args[0])
     fin2 = ROOT.TFile(args[1])
 
-    tree1 = fin1.Get("trialTree")
+    tree1 = fin1.Get("trialTree")   #truth's root tree
+    #tree1 = fin1.Get("fancy_tree") #Reconstruction's root  tree
     signal0 = tree1.AsMatrix(columns=branch_names)
-    signal = signal0[:1000,:]
-    tree2 = fin2.Get("trialTree")
+    signal = signal0[:100000,:]
+    #signal = signal0[:100000,:]
+    tree2 = fin2.Get("trialTree") #truth's root tree
+    #tree2 = fin2.Get("fancy_tree") #Reconstruction's root  tree
     backgr0 = tree2.AsMatrix(columns=branch_names)
-    backgr = backgr0[:1000,:]
+    backgr = backgr0[:100000,:]
+    #backgr = backgr0[:100000,:]
+
+    print('signal')
+    print(signal)
+    print('backgr')
+    print(backgr)
 
     # for sklearn data is usually organised into one 2D array of shape (n_samples * n_features)
     # containing all the data and one array of categories of length n_samples
     X_raw = np.concatenate((signal, backgr))
     y_raw = np.concatenate((np.ones(signal.shape[0]), np.zeros(backgr.shape[0])))
     print(len(signal))
+    print(len(backgr))
 
     print ('part2')
 
     #imbalanced learn
     n_sig = len(y_raw[y_raw==1])
     n_bkg = len(y_raw[y_raw==0])
+    print(n_sig)
+    print(n_bkg)
     sb_ratio = len(y_raw[y_raw==1])/(1.0*len(y_raw[y_raw==0]))
     if (sb_ratio > 0.2 and sb_ratio < 0.5):
         smote = SMOTE(ratio=0.5)
@@ -120,17 +149,21 @@ def main():
     Training Part
     """
     # Train and test
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.50, random_state=3443)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.40, random_state=42)
 
-    dt = DecisionTreeClassifier(max_depth=1, min_samples_leaf=10, min_samples_split=20)
+    #dt = DecisionTreeClassifier(max_depth=51, min_samples_leaf=20, min_samples_split=40)
 
-    bdt = AdaBoostClassifier(dt, algorithm='SAMME', n_estimators=800, learning_rate=0.5)
+    #bdt = AdaBoostClassifier(dt, algorithm='SAMME', n_estimators=250, learning_rate=0.03)
+    dt = DecisionTreeClassifier(max_depth=5, min_samples_leaf=100, min_samples_split=10)
+   
+    bdt = AdaBoostClassifier(dt, algorithm='SAMME', n_estimators=200, learning_rate=0.2)
     bdt.fit(X_train, y_train)
 
     importances = bdt.feature_importances_
-    f = open('bdt_results/output_importance.txt', 'w')
+    f = open('bdt_results/output_importance_New.txt', 'w')
     f.write("%-25s%-15s\n"%('Variable Name','Output Importance'))
-    for i in range (32):
+    #for i in range (32):
+    for i in range (17):
         f.write("%-25s%-15s\n"%(branch_names[i], importances[i]))
         print("%-25s%-15s\n"%(branch_names[i], importances[i]), file=f)
     f.close() 
@@ -138,10 +171,14 @@ def main():
     y_predicted = bdt.predict(X_train)
     print (classification_report(y_train, y_predicted, target_names=["background", "signal"]))
     print ("Area under ROC curve: %.4f"%(roc_auc_score(y_train, bdt.decision_function(X_train))))
+    y_trainacc = accuracy_score(y_train, y_predicted)
+    print("Area under ACC curve: %.4f"%y_trainacc)
 
     y_predicted = bdt.predict(X_test)
     print (classification_report(y_test, y_predicted, target_names=["background", "signal"]))
     print ("Area under ROC curve: %.4f"%(roc_auc_score(y_test, bdt.decision_function(X_test))))
+    y_trainacc = accuracy_score(y_test, y_predicted)
+    print("Area under ACC curve: %.4f"%y_trainacc)
 
     decisions1 = bdt.decision_function(X_train)
     decisions2 = bdt.decision_function(X_test)
@@ -165,12 +202,12 @@ def main():
     plt.title('Receiver operating  characteristic')
     plt.legend(loc = "lower right")
     plt.grid()
-    plt.savefig('./bdt_results/'+filepath+'/ROC.png')
+    plt.savefig('./bdt_results/'+filepath+'/ROC_Hbb.png')
 #    plt.show()
 
     compare_train_test(bdt, X_train, y_train, X_test, y_test, filepath)
 
-    joblib.dump(bdt, './bdt_results/'+filepath+'/bdt_model.pkl')
+    joblib.dump(bdt, './bdt_results/'+filepath+'/bdt_model_New.pkl')
 
 # Comparing train and test results
 def compare_train_test(clf, X_train, y_train, X_test, y_test, savepath, bins=30):
@@ -206,7 +243,7 @@ def compare_train_test(clf, X_train, y_train, X_test, y_test, savepath, bins=30)
     plt.xlabel("BDT score")
     plt.ylabel("Normalized Unit")
     plt.legend(loc='best')
-    plt.savefig("./bdt_results/"+savepath+"/BDTscore.png")
+    plt.savefig("./bdt_results/"+savepath+"/BDTscore_Hbb.png")
 #    plt.show()
 
 if __name__ == '__main__':
