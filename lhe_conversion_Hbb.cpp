@@ -86,7 +86,7 @@ void computeAngles(TLorentzVector p4M11,
     TLorentzVector p4h(0-p4Z.Px(),0-p4Z.Py(),0-p4Z.Pz(),p4Z.E());
 
     costhetastar=helicityAngle(p4m,p4h,p4M21);
-    costheta1=helicityAngle(p4m,p4m,p4Z);
+    costheta1=p4Z.CosTheta();//helicityAngle(p4m,p4m,p4Z);
     costheta2=helicityAngle(p4m,p4Z,p4M11);
     Phi=helicityAimuthalAngle(p4E,p4E_target,p4M11,p4M12);
     Phi1=helicityAimuthalAngle(p4E,p4E_target,p4M21,p4M22);
